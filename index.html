@@ -144,7 +144,7 @@
     <script>
         var ADMIN_PASSWORD = '202631415';
         var attendees = [];
-        var eventInfo = { name: '技术交流会', date: '' };
+        var eventInfo = { name: 'TeCAC 2026年会', date: '' };
         var syncInterval = null;
         
         function loadData() {
@@ -161,7 +161,7 @@
                 try {
                     eventInfo = JSON.parse(storedEvent);
                 } catch(e) {
-                    eventInfo = { name: '技术交流会', date: new Date().toLocaleDateString('zh-CN') };
+                    eventInfo = { name: 'TeCAC 2026年会', date: new Date().toLocaleDateString('zh-CN') };
                 }
             }
             if (!eventInfo.date) {
