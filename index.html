@@ -377,7 +377,7 @@
                 alert('暂无数据可导出！');
                 return;
             }
-            var sorted = attendees.slice().sort(function(a, b) { return a.id - b.id; };
+            var sorted = attendees.slice().sort(function(a, b) { return a.id - b.id; });
             var csv = '\ufeff序号,姓名,签到时间\n';
             for (var i = 0; i < sorted.length; i++) {
                 var a = sorted[i];
