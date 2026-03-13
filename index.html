@@ -21,8 +21,8 @@
         .checkin-page { display: none; width: 100%; min-height: 100vh; background: linear-gradient(135deg, #07c160 0%, #05a050 100%); padding: 20px; }
         .checkin-page.active { display: flex; flex-direction: column; justify-content: center; align-items: center; }
         .checkin-card { background: white; width: 100%; max-width: 400px; padding: 40px 30px; border-radius: 20px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); }
-        .checkin-card h1 { text-align: center; color: #333; font-size: 24px; margin-bottom: 10px; }
-        .event-name { text-align: center; color: #07c160; font-size: 18px; font-weight: bold; margin-bottom: 30px; }
+        .checkin-card h1 { text-align: center; color: #333; font-size: 22px; margin-bottom: 10px; }
+        .event-name { text-align: center; color: #07c160; font-size: 20px; font-weight: bold; margin-bottom: 30px; letter-spacing: 1px; }
         .success-page { display: none; text-align: center; padding: 40px 20px; }
         .success-page.active { display: block; }
         .success-icon { width: 80px; height: 80px; background: #07c160; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 30px; color: white; font-size: 40px; }
@@ -57,6 +57,7 @@
         .btn-danger { background: #fa5151; }
         .btn-warning { background: #ffc300; color: #333; }
         .logout-btn { position: absolute; top: 20px; right: 20px; background: rgba(255,255,255,0.9); color: #333; padding: 8px 16px; border-radius: 20px; font-size: 14px; border: none; cursor: pointer; }
+        .sync-status { font-size: 12px; color: #07c160; margin-left: 10px; }
         @media (max-width: 600px) { .stats-grid { grid-template-columns: repeat(3, 1fr); } .stat-number { font-size: 24px; } }
     </style>
 </head>
@@ -73,8 +74,8 @@
 
     <div id="checkinPage" class="checkin-page">
         <div class="checkin-card" id="checkinForm">
-            <h1>会议签到</h1>
-            <div class="event-name" id="checkinEventName">技术交流会</div>
+            <h1>TeCAC 2026年会签到</h1>
+            <div class="event-name" id="checkinEventName">TeCAC 2026 Annual Conference</div>
             <div class="input-group">
                 <label>请输入您的姓名</label>
                 <input type="text" id="attendeeName" placeholder="请输入姓名">
@@ -124,7 +125,10 @@
         </div>
         
         <div class="attendee-section">
-            <h3>签到名单 <span class="auto-update">● 实时自动更新</span></h3>
+            <h3>
+                签到名单
+                <span class="sync-status" id="syncStatus">● 实时同步中</span>
+            </h3>
             <div class="attendee-list" id="attendeeList">
                 <div class="empty-state">暂无签到记录</div>
             </div>
@@ -141,13 +145,28 @@
         var ADMIN_PASSWORD = '202631415';
         var attendees = [];
         var eventInfo = { name: '技术交流会', date: '' };
+        var syncInterval = null;
         
         function loadData() {
             var stored = localStorage.getItem('attendees');
-            if (stored) attendees = JSON.parse(stored);
+            if (stored) {
+                try {
+                    attendees = JSON.parse(stored);
+                } catch(e) {
+                    attendees = [];
+                }
+            }
             var storedEvent = localStorage.getItem('eventInfo');
-            if (storedEvent) eventInfo = JSON.parse(storedEvent);
-            if (!eventInfo.date) eventInfo.date = new Date().toLocaleDateString('zh-CN');
+            if (storedEvent) {
+                try {
+                    eventInfo = JSON.parse(storedEvent);
+                } catch(e) {
+                    eventInfo = { name: '技术交流会', date: new Date().toLocaleDateString('zh-CN') };
+                }
+            }
+            if (!eventInfo.date) {
+                eventInfo.date = new Date().toLocaleDateString('zh-CN');
+            }
         }
         
         window.onload = function() {
@@ -168,16 +187,49 @@
             document.getElementById('checkinEventName').textContent = eventInfo.name;
             document.title = eventInfo.name + ' - 签到';
             
+            // 启动实时同步
             if (sessionStorage.getItem('isAdmin') === 'true') {
                 updateStats();
                 renderAttendeeList();
-                setInterval(function() {
+                startSync();
+            }
+            
+            // 监听storage事件（同一浏览器不同标签页）
+            window.addEventListener('storage', function(e) {
+                if (e.key === 'attendees') {
                     loadData();
                     updateStats();
                     renderAttendeeList();
-                }, 3000);
-            }
+                    showSyncIndicator();
+                }
+            });
         };
+        
+        // 启动定时同步
+        function startSync() {
+            if (syncInterval) clearInterval(syncInterval);
+            syncInterval = setInterval(function() {
+                var oldCount = attendees.length;
+                loadData();
+                var newCount = attendees.length;
+                if (newCount !== oldCount) {
+                    updateStats();
+                    renderAttendeeList();
+                    showSyncIndicator();
+                }
+            }, 2000); // 每2秒检查一次
+        }
+        
+        // 显示同步指示器
+        function showSyncIndicator() {
+            var status = document.getElementById('syncStatus');
+            status.textContent = '● 刚刚更新';
+            status.style.color = '#07c160';
+            setTimeout(function() {
+                status.textContent = '● 实时同步中';
+                status.style.color = '#07c160';
+            }, 2000);
+        }
         
         function showLoginPage() {
             document.getElementById('loginPage').style.display = 'block';
@@ -205,11 +257,7 @@
             if (password === ADMIN_PASSWORD) {
                 sessionStorage.setItem('isAdmin', 'true');
                 showAdminPage();
-                setInterval(function() {
-                    loadData();
-                    updateStats();
-                    renderAttendeeList();
-                }, 3000);
+                startSync();
             } else {
                 document.getElementById('loginError').style.display = 'block';
                 setTimeout(function() {
@@ -220,6 +268,7 @@
         
         function logout() {
             sessionStorage.removeItem('isAdmin');
+            if (syncInterval) clearInterval(syncInterval);
             window.location.hash = '';
             location.reload();
         }
@@ -243,6 +292,10 @@
             };
             attendees.push(attendee);
             localStorage.setItem('attendees', JSON.stringify(attendees));
+            
+            // 触发storage事件通知其他页面
+            window.dispatchEvent(new StorageEvent('storage', { key: 'attendees' }));
+            
             document.getElementById('checkinForm').style.display = 'none';
             document.getElementById('successPage').classList.add('active');
         }
@@ -260,7 +313,6 @@
         function generateQRCode() {
             var qrContainer = document.getElementById('qrcode');
             qrContainer.innerHTML = '';
-            // 使用当前页面的完整URL生成二维码
             var currentUrl = window.location.href.split('#')[0];
             var checkInUrl = currentUrl + '#checkin';
             new QRCode(qrContainer, {
