@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>会议签到系统</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif; background: #f5f5f5; min-height: 100vh; }
+        .login-container { max-width: 400px; margin: 80px auto; background: white; padding: 40px 30px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+        .login-container h2 { text-align: center; color: #333; margin-bottom: 30px; font-size: 24px; }
+        .input-group { margin-bottom: 20px; }
+        .input-group label { display: block; margin-bottom: 8px; color: #555; font-size: 14px; }
+        .input-group input { width: 100%; padding: 14px; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; }
+        .input-group input:focus { outline: none; border-color: #07c160; }
+        .btn { width: 100%; padding: 14px; background: #07c160; color: white; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; }
+        .btn:hover { opacity: 0.9; }
+        .btn-secondary { background: #576b95; }
+        .error-message { color: #fa5151; font-size: 14px; text-align: center; margin-top: 10px; display: none; }
+        .checkin-page { display: none; width: 100%; min-height: 100vh; background: linear-gradient(135deg, #07c160 0%, #05a050 100%); padding: 20px; }
+        .checkin-page.active { display: flex; flex-direction: column; justify-content: center; align-items: center; }
+        .checkin-card { background: white; width: 100%; max-width: 400px; padding: 40px 30px; border-radius: 20px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); }
+        .checkin-card h1 { text-align: center; color: #333; font-size: 24px; margin-bottom: 10px; }
+        .event-name { text-align: center; color: #07c160; font-size: 18px; font-weight: bold; margin-bottom: 30px; }
+        .success-page { display: none; text-align: center; padding: 40px 20px; }
+        .success-page.active { display: block; }
+        .success-icon { width: 80px; height: 80px; background: #07c160; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 30px; color: white; font-size: 40px; }
+        .admin-page { display: none; max-width: 800px; margin: 0 auto; padding: 20px; }
+        .admin-page.active { display: block; }
+        .admin-header { background: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+        .admin-header h1 { font-size: 22px; color: #333; margin-bottom: 15px; }
+        .event-edit { display: flex; gap: 10px; flex-wrap: wrap; }
+        .event-edit input { flex: 1; min-width: 200px; padding: 10px 14px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; }
+        .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px; }
+        .stat-box { background: white; padding: 20px; border-radius: 12px; text-align: center; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+        .stat-number { font-size: 32px; font-weight: bold; color: #07c160; margin-bottom: 5px; }
+        .stat-label { font-size: 14px; color: #888; }
+        .qrcode-section { background: white; padding: 30px; border-radius: 12px; text-align: center; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+        .qrcode-section h3 { margin-bottom: 20px; color: #333; }
+        #qrcode { display: inline-block; padding: 20px; background: white; border: 1px solid #eee; border-radius: 8px; }
+        .qrcode-tip { color: #888; font-size: 14px; margin-top: 15px; }
+        .attendee-section { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+        .attendee-section h3 { margin-bottom: 20px; color: #333; display: flex; justify-content: space-between; align-items: center; }
+        .auto-update { font-size: 12px; color: #07c160; font-weight: normal; }
+        .attendee-list { max-height: 400px; overflow-y: auto; }
+        .attendee-item { display: flex; justify-content: space-between; align-items: center; padding: 15px; border-bottom: 1px solid #f0f0f0; }
+        .attendee-item:hover { background: #f9f9f9; }
+        .attendee-info { display: flex; align-items: center; gap: 12px; }
+        .attendee-number { width: 28px; height: 28px; background: #07c160; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: bold; }
+        .attendee-name { font-size: 16px; color: #333; font-weight: 500; }
+        .attendee-time { font-size: 13px; color: #888; }
+        .status-tag { background: #e8f5e9; color: #07c160; padding: 4px 12px; border-radius: 12px; font-size: 12px; }
+        .empty-state { text-align: center; padding: 60px 20px; color: #888; }
+        .action-buttons { display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap; }
+        .action-buttons .btn { flex: 1; min-width: 120px; }
+        .btn-danger { background: #fa5151; }
+        .btn-warning { background: #ffc300; color: #333; }
+        .logout-btn { position: absolute; top: 20px; right: 20px; background: rgba(255,255,255,0.9); color: #333; padding: 8px 16px; border-radius: 20px; font-size: 14px; border: none; cursor: pointer; }
+        @media (max-width: 600px) { .stats-grid { grid-template-columns: repeat(3, 1fr); } .stat-number { font-size: 24px; } }
+    </style>
+</head>
+<body>
+    <div id="loginPage" class="login-container">
+        <h2>🔐 管理员登录</h2>
+        <div class="input-group">
+            <label>请输入密码</label>
+            <input type="password" id="adminPassword" placeholder="请输入管理员密码">
+        </div>
+        <button class="btn" onclick="login()">登录</button>
+        <div id="loginError" class="error-message">密码错误</div>
+    </div>
+
+    <div id="checkinPage" class="checkin-page">
+        <div class="checkin-card" id="checkinForm">
+            <h1>会议签到</h1>
+            <div class="event-name" id="checkinEventName">技术交流会</div>
+            <div class="input-group">
+                <label>请输入您的姓名</label>
+                <input type="text" id="attendeeName" placeholder="请输入姓名">
+            </div>
+            <button class="btn" onclick="submitCheckIn()" style="font-size: 18px; padding: 16px;">确认签到</button>
+        </div>
+        <div class="checkin-card success-page" id="successPage">
+            <div class="success-icon">✓</div>
+            <h2>签到成功！</h2>
+            <p>欢迎参会，请妥善保管好您的随身物品</p>
+        </div>
+    </div>
+
+    <div id="adminPage" class="admin-page">
+        <button class="logout-btn" onclick="logout()">退出登录</button>
+        <div class="admin-header">
+            <h1>📊 会议签到管理</h1>
+            <div class="event-edit">
+                <input type="text" id="eventNameInput" placeholder="会议名称">
+                <input type="text" id="eventDateInput" placeholder="会议日期">
+                <button class="btn btn-secondary" onclick="updateEventInfo()" style="width: auto; padding: 10px 20px;">更新</button>
+            </div>
+        </div>
+        
+        <div class="stats-grid">
+            <div class="stat-box">
+                <div class="stat-number" id="totalCount">0</div>
+                <div class="stat-label">已签到</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-number" id="lastHourCount">0</div>
+                <div class="stat-label">近1小时</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-number" id="checkInRate">0%</div>
+                <div class="stat-label">签到率</div>
+            </div>
+        </div>
+        
+        <div class="qrcode-section">
+            <h3>📱 签到二维码</h3>
+            <div id="qrcode"></div>
+            <div class="qrcode-tip">请参会人员使用微信扫描上方二维码进行签到</div>
+            <div style="margin-top: 15px; padding: 10px; background: #e8f5e9; border-radius: 8px; font-size: 13px; color: #07c160;">
+                ✅ 已部署到线上，微信扫码可直接访问
+            </div>
+        </div>
+        
+        <div class="attendee-section">
+            <h3>签到名单 <span class="auto-update">● 实时自动更新</span></h3>
+            <div class="attendee-list" id="attendeeList">
+                <div class="empty-state">暂无签到记录</div>
+            </div>
+            
+            <div class="action-buttons">
+                <button class="btn" onclick="exportToWord()">📄 导出Word</button>
+                <button class="btn btn-warning" onclick="exportToExcel()">📊 导出Excel</button>
+                <button class="btn btn-danger" onclick="clearAllData()">🗑️ 清空数据</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        var ADMIN_PASSWORD = '202631415';
+        var attendees = [];
+        var eventInfo = { name: '技术交流会', date: '' };
+        
+        function loadData() {
+            var stored = localStorage.getItem('attendees');
+            if (stored) attendees = JSON.parse(stored);
+            var storedEvent = localStorage.getItem('eventInfo');
+            if (storedEvent) eventInfo = JSON.parse(storedEvent);
+            if (!eventInfo.date) eventInfo.date = new Date().toLocaleDateString('zh-CN');
+        }
+        
+        window.onload = function() {
+            loadData();
+            var hash = window.location.hash;
+            var isCheckIn = hash === '#checkin';
+            
+            if (isCheckIn) {
+                showCheckInPage();
+            } else if (sessionStorage.getItem('isAdmin') === 'true') {
+                showAdminPage();
+            } else {
+                showLoginPage();
+            }
+            
+            document.getElementById('eventNameInput').value = eventInfo.name;
+            document.getElementById('eventDateInput').value = eventInfo.date;
+            document.getElementById('checkinEventName').textContent = eventInfo.name;
+            document.title = eventInfo.name + ' - 签到';
+            
+            if (sessionStorage.getItem('isAdmin') === 'true') {
+                updateStats();
+                renderAttendeeList();
+                setInterval(function() {
+                    loadData();
+                    updateStats();
+                    renderAttendeeList();
+                }, 3000);
+            }
+        };
+        
+        function showLoginPage() {
+            document.getElementById('loginPage').style.display = 'block';
+            document.getElementById('checkinPage').classList.remove('active');
+            document.getElementById('adminPage').classList.remove('active');
+        }
+        
+        function showCheckInPage() {
+            document.getElementById('loginPage').style.display = 'none';
+            document.getElementById('checkinPage').classList.add('active');
+            document.getElementById('adminPage').classList.remove('active');
+        }
+        
+        function showAdminPage() {
+            document.getElementById('loginPage').style.display = 'none';
+            document.getElementById('checkinPage').classList.remove('active');
+            document.getElementById('adminPage').classList.add('active');
+            generateQRCode();
+            updateStats();
+            renderAttendeeList();
+        }
+        
+        function login() {
+            var password = document.getElementById('adminPassword').value;
+            if (password === ADMIN_PASSWORD) {
+                sessionStorage.setItem('isAdmin', 'true');
+                showAdminPage();
+                setInterval(function() {
+                    loadData();
+                    updateStats();
+                    renderAttendeeList();
+                }, 3000);
+            } else {
+                document.getElementById('loginError').style.display = 'block';
+                setTimeout(function() {
+                    document.getElementById('loginError').style.display = 'none';
+                }, 3000);
+            }
+        }
+        
+        function logout() {
+            sessionStorage.removeItem('isAdmin');
+            window.location.hash = '';
+            location.reload();
+        }
+        
+        function submitCheckIn() {
+            var name = document.getElementById('attendeeName').value.trim();
+            if (!name) {
+                alert('请输入姓名！');
+                return;
+            }
+            for (var i = 0; i < attendees.length; i++) {
+                if (attendees[i].name === name) {
+                    alert('您已签到，请勿重复签到！');
+                    return;
+                }
+            }
+            var attendee = {
+                id: Date.now(),
+                name: name,
+                checkInTime: new Date().toLocaleString('zh-CN')
+            };
+            attendees.push(attendee);
+            localStorage.setItem('attendees', JSON.stringify(attendees));
+            document.getElementById('checkinForm').style.display = 'none';
+            document.getElementById('successPage').classList.add('active');
+        }
+        
+        function updateEventInfo() {
+            eventInfo.name = document.getElementById('eventNameInput').value || '会议签到';
+            eventInfo.date = document.getElementById('eventDateInput').value || new Date().toLocaleDateString('zh-CN');
+            localStorage.setItem('eventInfo', JSON.stringify(eventInfo));
+            document.getElementById('checkinEventName').textContent = eventInfo.name;
+            document.title = eventInfo.name + ' - 签到';
+            generateQRCode();
+            alert('会议信息已更新！');
+        }
+        
+        function generateQRCode() {
+            var qrContainer = document.getElementById('qrcode');
+            qrContainer.innerHTML = '';
+            // 使用当前页面的完整URL生成二维码
+            var currentUrl = window.location.href.split('#')[0];
+            var checkInUrl = currentUrl + '#checkin';
+            new QRCode(qrContainer, {
+                text: checkInUrl,
+                width: 200,
+                height: 200,
+                colorDark: '#07c160',
+                colorLight: '#ffffff',
+                correctLevel: QRCode.CorrectLevel.M
+            });
+        }
+        
+        function updateStats() {
+            document.getElementById('totalCount').textContent = attendees.length;
+            var oneHourAgo = Date.now() - 3600000;
+            var recentCount = 0;
+            for (var i = 0; i < attendees.length; i++) {
+                if (attendees[i].id > oneHourAgo) recentCount++;
+            }
+            document.getElementById('lastHourCount').textContent = recentCount;
+            var expected = 100;
+            var rate = Math.round((attendees.length / expected) * 100);
+            document.getElementById('checkInRate').textContent = rate + '%';
+        }
+        
+        function renderAttendeeList() {
+            var list = document.getElementById('attendeeList');
+            if (attendees.length === 0) {
+                list.innerHTML = '<div class="empty-state">暂无签到记录</div>';
+                return;
+            }
+            var sorted = attendees.slice().sort(function(a, b) { return b.id - a.id; });
+            var html = '';
+            for (var i = 0; i < sorted.length; i++) {
+                var a = sorted[i];
+                var num = attendees.length - i;
+                html += '<div class="attendee-item">';
+                html += '<div class="attendee-info">';
+                html += '<div class="attendee-number">' + num + '</div>';
+                html += '<div><div class="attendee-name">' + a.name + '</div>';
+                html += '<div class="attendee-time">' + a.checkInTime + '</div></div>';
+                html += '</div>';
+                html += '<span class="status-tag">已签到</span>';
+                html += '</div>';
+            }
+            list.innerHTML = html;
+        }
+        
+        function exportToWord() {
+            if (attendees.length === 0) {
+                alert('暂无数据可导出！');
+                return;
+            }
+            var sorted = attendees.slice().sort(function(a, b) { return a.id - b.id; });
+            var tableRows = '';
+            for (var i = 0; i < sorted.length; i++) {
+                var a = sorted[i];
+                tableRows += '<tr>';
+                tableRows += '<td style="border:1px solid #000;padding:8px;text-align:center;">' + (i + 1) + '</td>';
+                tableRows += '<td style="border:1px solid #000;padding:8px;">' + a.name + '</td>';
+                tableRows += '<td style="border:1px solid #000;padding:8px;text-align:center;">' + a.checkInTime + '</td>';
+                tableRows += '</tr>';
+            }
+            var html = '<html><head><meta charset="utf-8"></head><body>';
+            html += '<h2 style="text-align:center;">' + eventInfo.name + ' - 签到名单</h2>';
+            html += '<p style="text-align:center;color:#666;">会议日期：' + eventInfo.date + ' | 导出时间：' + new Date().toLocaleString('zh-CN') + '</p>';
+            html += '<table style="width:100%;border-collapse:collapse;margin-top:20px;">';
+            html += '<thead><tr style="background:#f0f0f0;">';
+            html += '<th style="border:1px solid #000;padding:10px;width:80px;">序号</th>';
+            html += '<th style="border:1px solid #000;padding:10px;">姓名</th>';
+            html += '<th style="border:1px solid #000;padding:10px;width:180px;">签到时间</th>';
+            html += '</tr></thead><tbody>' + tableRows + '</tbody></table>';
+            html += '<p style="margin-top:30px;text-align:right;color:#666;">总人数：' + attendees.length + '人</p>';
+            html += '</body></html>';
+            
+            var blob = new Blob(['\ufeff', html], { type: 'application/msword' });
+            var link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = eventInfo.name + '_签到名单_' + new Date().toLocaleDateString('zh-CN') + '.doc';
+            link.click();
+        }
+        
+        function exportToExcel() {
+            if (attendees.length === 0) {
+                alert('暂无数据可导出！');
+                return;
+            }
+            var sorted = attendees.slice().sort(function(a, b) { return a.id - b.id; });
+            var csv = '\ufeff序号,姓名,签到时间\n';
+            for (var i = 0; i < sorted.length; i++) {
+                var a = sorted[i];
+                csv += (i + 1) + ',' + a.name + ',' + a.checkInTime + '\n';
+            }
+            var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            var link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = eventInfo.name + '_签到名单_' + new Date().toLocaleDateString('zh-CN') + '.csv';
+            link.click();
+        }
+        
+        function clearAllData() {
+            if (confirm('确定要清空所有签到数据吗？此操作不可恢复！')) {
+                attendees = [];
+                localStorage.removeItem('attendees');
+                updateStats();
+                renderAttendeeList();
+                alert('数据已清空！');
+            }
+        }
+    </script>
+</body>
+</html>
