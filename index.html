@@ -197,25 +197,47 @@
         
         window.onload = initPage;
         
-        // 启动定时同步
+        // 启动定时同步 - 每2秒刷新一次
         function startSync() {
             if (syncInterval) clearInterval(syncInterval);
+            
+            // 立即执行一次
+            refreshData();
+            
             syncInterval = setInterval(function() {
-                var oldCount = attendees.length;
-                loadData();
-                var newCount = attendees.length;
-                if (newCount !== oldCount) {
-                    updateStats();
-                    renderAttendeeList();
-                    showSyncIndicator();
-                }
+                refreshData();
             }, 2000);
         }
         
-        function showSyncIndicator() {
+        // 刷新数据
+        function refreshData() {
+            var oldCount = attendees.length;
+            loadData();
+            var newCount = attendees.length;
+            
+            // 无论数量是否变化，都更新显示（时间可能变化）
+            updateStats();
+            renderAttendeeList();
+            
+            // 如果有新数据，显示更新提示
+            if (newCount > oldCount) {
+                showSyncIndicator(newCount - oldCount);
+            }
+        }
+        
+        function showSyncIndicator(newCount) {
             var status = document.getElementById('syncStatus');
-            status.textContent = '● 刚刚更新 ' + new Date().toLocaleTimeString();
+            if (newCount > 0) {
+                status.textContent = '● 刚刚更新 +' + newCount + '人 ' + new Date().toLocaleTimeString();
+            } else {
+                status.textContent = '● 实时同步中 ' + new Date().toLocaleTimeString();
+            }
             status.style.color = '#07c160';
+            
+            // 3秒后恢复默认状态
+            setTimeout(function() {
+                status.textContent = '● 实时同步中';
+            }, 3000);
         }
         
         function showLoginPage() {
