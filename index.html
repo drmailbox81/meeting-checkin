@@ -61,6 +61,7 @@
     </style>
 </head>
 <body>
+    <!-- 登录页面 -->
     <div id="loginPage" class="login-container">
         <h2>🔐 管理员登录</h2>
         <div class="input-group">
@@ -71,6 +72,7 @@
         <div id="loginError" class="error-message">密码错误</div>
     </div>
 
+    <!-- 签到页面 -->
     <div id="checkinPage" class="checkin-page">
         <div class="checkin-card" id="checkinForm">
             <h1>TeCAC 2026年会签到</h1>
@@ -88,6 +90,7 @@
         </div>
     </div>
 
+    <!-- 管理页面 -->
     <div id="adminPage" class="admin-page">
         <button class="logout-btn" onclick="logout()">退出登录</button>
         <div class="admin-header">
@@ -118,6 +121,7 @@
             <h3>📱 签到二维码</h3>
             <div id="qrcode"></div>
             <div class="qrcode-tip">请参会人员使用微信扫描上方二维码进行签到</div>
+            <div id="qrcodeUrl" style="margin-top: 10px; font-size: 12px; color: #666; word-break: break-all;"></div>
         </div>
         
         <div class="attendee-section">
@@ -141,9 +145,7 @@
         var ADMIN_PASSWORD = '202631415';
         var attendees = [];
         var syncInterval = null;
-        
-        // 统一的数据键名
-        var STORAGE_KEY = 'tecac2026_attendees';
+        var STORAGE_KEY = 'tecac2026_attendees_v2';
         
         function loadData() {
             var stored = localStorage.getItem(STORAGE_KEY);
@@ -162,32 +164,40 @@
             localStorage.setItem(STORAGE_KEY, JSON.stringify(attendees));
         }
         
-        window.onload = function() {
+        // 页面初始化 - 优先检查是否为签到模式
+        function initPage() {
             loadData();
-            var hash = window.location.hash;
-            var isCheckIn = hash === '#checkin';
             
+            // 获取URL hash，支持多种格式：#checkin, #/checkin, ?checkin=true
+            var hash = window.location.hash;
+            var search = window.location.search;
+            var isCheckIn = (hash.indexOf('checkin') >= 0) || (search.indexOf('checkin') >= 0);
+            
+            console.log('Hash:', hash, 'Search:', search, 'IsCheckIn:', isCheckIn);
+            
+            // 强制根据URL决定显示哪个页面
             if (isCheckIn) {
+                // 签到模式 - 清除可能的管理员状态，确保显示签到页面
                 showCheckInPage();
-            } else if (sessionStorage.getItem('isAdmin') === 'true') {
-                showAdminPage();
             } else {
-                showLoginPage();
+                // 非签到模式，检查是否已登录管理员
+                var isAdmin = sessionStorage.getItem('isAdmin') === 'true';
+                if (isAdmin) {
+                    showAdminPage();
+                    startSync();
+                } else {
+                    showLoginPage();
+                }
             }
             
             // 设置当前日期
             var today = new Date().toLocaleDateString('zh-CN');
             document.getElementById('eventDateInput').value = today;
-            
-            // 管理员模式启动实时同步
-            if (sessionStorage.getItem('isAdmin') === 'true') {
-                updateStats();
-                renderAttendeeList();
-                startSync();
-            }
-        };
+        }
         
-        // 启动定时同步 - 每秒检查一次
+        window.onload = initPage;
+        
+        // 启动定时同步
         function startSync() {
             if (syncInterval) clearInterval(syncInterval);
             syncInterval = setInterval(function() {
@@ -199,7 +209,7 @@
                     renderAttendeeList();
                     showSyncIndicator();
                 }
-            }, 1000);
+            }, 2000);
         }
         
         function showSyncIndicator() {
@@ -209,24 +219,27 @@
         }
         
         function showLoginPage() {
+            hideAllPages();
             document.getElementById('loginPage').style.display = 'block';
-            document.getElementById('checkinPage').classList.remove('active');
-            document.getElementById('adminPage').classList.remove('active');
         }
         
         function showCheckInPage() {
-            document.getElementById('loginPage').style.display = 'none';
+            hideAllPages();
             document.getElementById('checkinPage').classList.add('active');
-            document.getElementById('adminPage').classList.remove('active');
         }
         
         function showAdminPage() {
-            document.getElementById('loginPage').style.display = 'none';
-            document.getElementById('checkinPage').classList.remove('active');
+            hideAllPages();
             document.getElementById('adminPage').classList.add('active');
             generateQRCode();
             updateStats();
             renderAttendeeList();
+        }
+        
+        function hideAllPages() {
+            document.getElementById('loginPage').style.display = 'none';
+            document.getElementById('checkinPage').classList.remove('active');
+            document.getElementById('adminPage').classList.remove('active');
         }
         
         function login() {
@@ -257,10 +270,8 @@
                 return;
             }
             
-            // 重新加载最新数据
             loadData();
             
-            // 检查是否已签到
             for (var i = 0; i < attendees.length; i++) {
                 if (attendees[i].name === name) {
                     alert('您已签到，请勿重复签到！');
@@ -290,8 +301,19 @@
         function generateQRCode() {
             var qrContainer = document.getElementById('qrcode');
             qrContainer.innerHTML = '';
-            var currentUrl = window.location.href.split('#')[0];
-            var checkInUrl = currentUrl + '#checkin';
+            
+            // 获取基础URL（不含hash和参数）
+            var url = new URL(window.location.href);
+            url.hash = '';
+            url.search = '';
+            var baseUrl = url.toString();
+            var checkInUrl = baseUrl + '#checkin';
+            
+            // 显示URL供调试
+            document.getElementById('qrcodeUrl').textContent = checkInUrl;
+            
+            console.log('QR Code URL:', checkInUrl);
+            
             new QRCode(qrContainer, {
                 text: checkInUrl,
                 width: 200,
